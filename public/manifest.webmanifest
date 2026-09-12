@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "Couple Order Shop",
+  "short_name": "Order Shop",
+  "description": "A little shop the two of you order from",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "en",
+  "background_color": "#fff6f8",
+  "theme_color": "#fff6f8",
+  "icons": [
+    { "src": "/assets/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/app-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/app-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

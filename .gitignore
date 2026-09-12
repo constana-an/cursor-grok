@@ -1,0 +1,16 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+.env.local
+.env.*.local
+.vapid.local.json
+.netlify/
+.wrangler/
+
+# Local-only VAPID secrets for the edge runtime; never commit.
+supabase/functions/.env
+
+# Local Supabase CLI state, not part of the schema.
+supabase/.branches/
+supabase/.temp/

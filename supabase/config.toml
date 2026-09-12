@@ -1,0 +1,10 @@
+# Supabase CLI project config. `project_id` is only a local label; the remote
+# project this pushes to is whatever `supabase link --project-ref` selected, and
+# that reference is stored outside the repo.
+project_id = "couple-order-shop"
+
+[db]
+major_version = 15
+
+[functions.notify-partner]
+verify_jwt = true
