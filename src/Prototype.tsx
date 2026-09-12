@@ -25,6 +25,7 @@ import { STATUS_TEXT, categoryMeta, desiredTimes, earnedInWeek, localizeDesiredT
 import { dayKeyOf, formatStartedOn, isValidDateKey, normalizeDateInput, relationshipDays, todayKey } from "./lib/date";
 import { checkinStatusFrom, checkinStreak, dueAnniversaries } from "./lib/date";
 import { authErrorMessage, orderErrorMessage, orderStatusErrorMessage, rewardErrorMessage, wishErrorMessage } from "./lib/errors";
+import { cleanCodeInput, joinLink, parseJoinCode, syncAge, syncAgeValue } from "./lib/pairing";
 import { orderHistory, pinnedItems } from "./lib/history";
 import { buildMoments } from "./lib/moments";
 import { LanguageProvider, useI18n } from "./i18n";
@@ -75,7 +76,9 @@ import type {
 } from "./lib/types";
 import { MemoriesScreen } from "./screens/MemoriesScreen";
 import { MenuArt } from "./screens/MenuArt";
+import { InviteSheet } from "./screens/InviteSheet";
 import { MomentsSection } from "./screens/MomentsSection";
+import { MoveSheet } from "./screens/MoveSheet";
 import { OnboardingSheet, PAIRING_BONUS } from "./screens/OnboardingSheet";
 import { OpeningProgress, type OpeningStep } from "./screens/OpeningProgress";
 import { OrdersScreen } from "./screens/OrdersScreen";
@@ -228,15 +231,21 @@ function newId(): string {
   return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}`;
 }
 
-/** Reads the view/order hints the service worker puts on notification links. */
-function readDeepLink(): { view: MainView | null; orderId: string | null } {
-  if (typeof window === "undefined") return { view: null, orderId: null };
+/**
+ * Reads the hints on an incoming link: the view and order a notification points
+ * at, and the couple code an invitation carries.
+ */
+function readDeepLink(): { view: MainView | null; orderId: string | null; joinCode: string | null } {
+  if (typeof window === "undefined") return { view: null, orderId: null, joinCode: null };
   const params = new URLSearchParams(window.location.search);
   const requested = params.get("view");
   const views: MainView[] = ["shop", "tasks", "orders", "memories", "ours"];
   const view = views.find((candidate) => candidate === requested) ?? null;
   const orderId = params.get("order");
-  return { view: orderId ? "orders" : view, orderId };
+  const joinCode = parseJoinCode(window.location.search);
+  // An invitation lands on the page that can act on it, whatever else the link
+  // asked for — the person who opened it is here to pair, not to browse.
+  return { view: joinCode ? "ours" : orderId ? "orders" : view, orderId, joinCode };
 }
 
 /**
@@ -303,6 +312,14 @@ function CoupleShop() {
   const [cloudCoupleId, setCloudCoupleId] = useState<string | null>(() => localStorage.getItem(STORAGE_KEYS.cloudId));
   const [inviteCode, setInviteCode] = useState<string | null>(() => localStorage.getItem(STORAGE_KEYS.inviteCode));
   const [pairingCode, setPairingCode] = useState("");
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  // "Connected" is not the same as "reading each other's writes". The strip
+  // used to claim the first and never check the second, so a dropped realtime
+  // channel looked exactly like a working one.
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(() => localStorage.getItem(STORAGE_KEYS.lastSync));
+  const [realtime, setRealtime] = useState<"connecting" | "live" | "dropped">("connecting");
+  const [syncNonce, setSyncNonce] = useState(0);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
@@ -381,6 +398,12 @@ function CoupleShop() {
     () => pinnedItems({ menu: MENU, customItems, favouriteIds: favourites, history, usedLimitedIds }),
     [customItems, favourites, history, usedLimitedIds],
   );
+  // The invitation URL: this app's own origin plus the code, so opening it
+  // lands here with the field filled in — and an uninstalled phone opens the
+  // same page in a browser and can pair from there.
+  const inviteLink = inviteCode && typeof window !== "undefined"
+    ? joinLink(window.location.origin, window.location.pathname, inviteCode)
+    : null;
   const moments = useMemo(
     () => buildMoments({ orders, anniversaries, currentName: currentName ?? "", coins, history }),
     [orders, anniversaries, currentName, coins, history],
@@ -596,14 +619,31 @@ function CoupleShop() {
   }, []);
 
   useEffect(() => {
-    const { view: deepView, orderId } = readDeepLink();
-    if (!deepView && !orderId) return;
+    const { view: deepView, orderId, joinCode } = readDeepLink();
+    if (!deepView && !orderId && !joinCode) return;
     setView(deepView ?? "orders");
     // The order may not have loaded from the cloud yet, so hold the id until
     // the list can act on it rather than dropping it here.
     if (orderId) setFocusOrderId(orderId);
+    // The field is filled in but not submitted: joining needs an account, and
+    // pairing someone into a shop without them tapping anything is worse than
+    // one extra tap.
+    if (joinCode) {
+      setPairingCode(joinCode);
+      showToast(t("toast.joinCodeReady"));
+    }
     window.history.replaceState(null, "", window.location.pathname);
   }, []);
+
+  // The "synced N minutes ago" line has to keep counting when nothing else on
+  // screen is changing — which is exactly the situation a dropped connection
+  // produces, and exactly when the reader needs the number to be true.
+  const [, setClock] = useState(0);
+  useEffect(() => {
+    if (!cloudCoupleId) return;
+    const timer = window.setInterval(() => setClock((value) => value + 1), 60_000);
+    return () => window.clearInterval(timer);
+  }, [cloudCoupleId]);
 
   // A stale focus must not fire minutes later when the tab comes back. Only on
   // an actual departure: on mount `view` is still "shop" while the deep-link
@@ -809,9 +849,25 @@ function CoupleShop() {
     if (data) setMemories(await signMemoryRows(client, data));
   }, [signMemoryRows]);
 
+  /** Stamped on every successful cloud read, so the strip can say how stale it is. */
+  const markSynced = useCallback(() => {
+    const now = new Date().toISOString();
+    setLastSyncedAt(now);
+    try {
+      localStorage.setItem(STORAGE_KEYS.lastSync, now);
+    } catch {
+      // A blocked storage only costs the timestamp across a cold launch.
+    }
+  }, []);
+
   const loadOrders = useCallback(async (client: SupabaseClient, coupleId: string) => {
-    const { data } = await client.from("orders").select("*").eq("couple_id", coupleId).order("created_at", { ascending: false });
-    setOrders((data ?? []).map((row) => ({
+    const { data, error } = await client.from("orders").select("*").eq("couple_id", coupleId).order("created_at", { ascending: false });
+    // A failed read used to empty the list: `data` comes back null on error and
+    // the map ran anyway, so a dropped connection looked like a shop with no
+    // orders in it. Keep what is on screen and let the timestamp go stale.
+    if (error || !data) return;
+    markSynced();
+    setOrders(data.map((row) => ({
       id: row.id,
       itemId: row.item_id,
       itemName: row.item_name,
@@ -828,7 +884,7 @@ function CoupleShop() {
       completedAt: row.completed_at ?? undefined,
       declineNote: row.decline_note ?? undefined,
     })));
-  }, []);
+  }, [markSynced]);
 
   /** Wallets are personal, so the balance lives on this user's profile row. */
   const loadMyBalance = useCallback(async (client: SupabaseClient) => {
@@ -899,6 +955,7 @@ function CoupleShop() {
     let active = true;
     const client = supabase;
     const coupleId = cloudCoupleId;
+    setRealtime("connecting");
 
     const loadAll = async () => {
       await Promise.all([
@@ -961,12 +1018,19 @@ function CoupleShop() {
       .on("postgres_changes", { event: "*", schema: "public", table: "daily_checkins", filter: `couple_id=eq.${coupleId}` }, () => {
         void loadPartnerStatus(client);
       })
-      .subscribe();
+      // Realtime is what makes the shop feel like one shop. When it is gone the
+      // two phones still work, they just stop hearing each other — and that is
+      // worth saying out loud rather than leaving the strip on "实时".
+      .subscribe((status) => {
+        if (!active) return;
+        if (status === "SUBSCRIBED") setRealtime("live");
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") setRealtime("dropped");
+      });
     return () => {
       active = false;
       client.removeChannel(channel);
     };
-  }, [supabase, cloudCoupleId, authUser, loadOrders, loadCouple, loadMyBalance, loadMemories, loadAnniversaries, loadCustomWishes, loadPartnerStatus, setClaimedTasks]);
+  }, [supabase, cloudCoupleId, authUser, syncNonce, loadOrders, loadCouple, loadMyBalance, loadMemories, loadAnniversaries, loadCustomWishes, loadPartnerStatus, setClaimedTasks]);
 
   // Signed photo links expire after an hour; refresh them when the album is
   // opened again or the app returns to the foreground.
@@ -1503,8 +1567,58 @@ function CoupleShop() {
       await navigator.clipboard.writeText(inviteCode);
       showToast(t("toast.inviteCopied", { code: inviteCode }));
     } catch {
+      // A blocked clipboard still has to leave the reader with the code.
       showToast(t("toast.inviteIs", { code: inviteCode }));
     }
+  };
+
+  /**
+   * The invitation, through whatever the two of them already talk in.
+   *
+   * `navigator.share` is the whole point on a phone — it reaches iMessage and
+   * WeChat without this app knowing either exists — but it only exists on some
+   * browsers and only in a secure context, and it rejects when the sheet is
+   * dismissed. A cancelled share is not a failure and must not be answered with
+   * a clipboard toast; anything else falls back to copying the link.
+   */
+  const shareInvite = async () => {
+    if (!inviteCode || !inviteLink) return;
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: shownProfile.shopName,
+          text: t("invite.shareText", { code: inviteCode }),
+          url: inviteLink,
+        });
+        return;
+      } catch (error) {
+        if ((error as { name?: string } | null)?.name === "AbortError") return;
+      }
+    }
+    await copyInviteLink();
+  };
+
+  const copyInviteLink = async () => {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      showToast(t("toast.linkCopied"));
+    } catch {
+      showToast(t("toast.linkIs", { link: inviteLink }));
+    }
+  };
+
+  /**
+   * Re-reads everything and re-opens the realtime channel.
+   *
+   * Bumping the nonce re-runs the effect that owns both, which is the point:
+   * when the live connection is what broke, re-reading the tables without
+   * re-subscribing would leave the shop quiet again a second later.
+   */
+  const syncNow = () => {
+    if (!cloudCoupleId) return setView("ours");
+    setSyncNonce((value) => value + 1);
+    showToast(t("toast.resyncing"));
   };
 
   const submitOrder = async () => {
@@ -1762,11 +1876,28 @@ function CoupleShop() {
   const currentLabel = localizedPersonName(currentName, lang);
   const partnerLabel = localizedPersonName(partnerName, lang);
 
+  // How stale the cloud copy is, in buckets: a timestamp to the second only
+  // invites watching it.
+  const age = syncAge(lastSyncedAt);
+  const freshness = !lastSyncedAt || !age
+    ? t("sync.never")
+    : age === "now"
+      ? t("sync.syncedNow")
+      : age === "minutes"
+        ? t("sync.syncedMinutes", { count: syncAgeValue(lastSyncedAt) })
+        : age === "hours"
+          ? t("sync.syncedHours", { count: syncAgeValue(lastSyncedAt) })
+          : t("sync.syncedStale");
+
   const syncState = cloudCoupleId
-    ? { title: t("sync.connected", { partner: partnerLabel }), detail: t("sync.connectedDetail"), live: true }
+    ? realtime === "live"
+      ? { title: t("sync.connected", { partner: partnerLabel }), detail: freshness, live: true, action: null }
+      : realtime === "connecting"
+        ? { title: t("sync.connected", { partner: partnerLabel }), detail: t("sync.reconnecting"), live: false, action: null }
+        : { title: t("sync.dropped"), detail: freshness, live: false, action: "retry" as const }
     : cloudEnabled
-      ? { title: t("sync.waiting", { partner: partnerLabel }), detail: t("sync.waitingDetail"), live: false }
-      : { title: t("sync.local"), detail: t("sync.localDetail"), live: false };
+      ? { title: t("sync.waiting", { partner: partnerLabel }), detail: t("sync.waitingDetail"), live: false, action: "connect" as const }
+      : { title: t("sync.local"), detail: t("sync.localDetail"), live: false, action: null };
 
   // The cloud steps only exist for a build that has a project behind it; on a
   // local install the checklist is honestly two steps long.
@@ -1833,15 +1964,19 @@ function CoupleShop() {
           {/* Not a sign when it is also the fix: unpaired, this line is the
               shortest route to pairing, so it is a button. */}
           <section
-            className="live-push-strip"
-            aria-label={syncState.live ? t("sync.ariaStatus") : t("sync.ariaConnect")}
-            role={syncState.live ? undefined : "button"}
-            tabIndex={syncState.live ? undefined : 0}
-            onClick={syncState.live ? undefined : () => setView("ours")}
+            className={`live-push-strip ${syncState.action === "retry" ? "is-dropped" : ""}`.trim()}
+            aria-label={syncState.action === "retry"
+              ? t("sync.ariaRetry")
+              : syncState.action === "connect" ? t("sync.ariaConnect") : t("sync.ariaStatus")}
+            role={syncState.action ? "button" : undefined}
+            tabIndex={syncState.action ? 0 : undefined}
+            onClick={syncState.action === "retry" ? syncNow : syncState.action === "connect" ? () => setView("ours") : undefined}
           >
             <span className="live-push-icon"><BellIcon /></span>
             <div><strong>{syncState.title}</strong><small>{syncState.detail}</small></div>
-            {syncState.live ? <span className="live-state"><i /> {t("sync.live")}</span> : <span className="live-go">{t("sync.goConnect")}</span>}
+            {syncState.live
+              ? <span className="live-state"><i /> {t("sync.live")}</span>
+              : syncState.action && <span className="live-go">{syncState.action === "retry" ? t("sync.retry") : t("sync.goConnect")}</span>}
           </section>
           {view === "shop" && !openingDismissed && (
             <OpeningProgress steps={openingSteps} onDismiss={() => {
@@ -1935,7 +2070,11 @@ function CoupleShop() {
               onEnableNotifications={enableNotifications}
               cloudCoupleId={cloudCoupleId}
               inviteCode={cloudCoupleId ? inviteCode : null}
-              onCopyInviteCode={copyInviteCode}
+              onOpenInvite={() => setInviteOpen(true)}
+              onOpenMove={() => setMoveOpen(true)}
+              syncDetail={freshness}
+              realtime={realtime}
+              onSyncNow={syncNow}
               pairingCode={pairingCode}
               setPairingCode={setPairingCode}
               cloudBusy={cloudBusy}
@@ -2214,6 +2353,24 @@ function CoupleShop() {
         </div>
       </BottomSheet>
 
+      {inviteCode && inviteLink && (
+        <InviteSheet
+          open={inviteOpen}
+          onOpenChange={setInviteOpen}
+          partnerName={partnerLabel}
+          code={inviteCode}
+          link={inviteLink}
+          onShare={shareInvite}
+          onCopyLink={copyInviteLink}
+          onCopyCode={copyInviteCode}
+        />
+      )}
+      <MoveSheet
+        open={moveOpen}
+        onOpenChange={setMoveOpen}
+        account={authUser && !authUser.is_anonymous ? authUser.email ?? authUser.phone ?? null : null}
+        onOpenAccount={() => { setMoveOpen(false); openAccount(); }}
+      />
       <OnboardingSheet open={onboardingOpen} partnerName={partnerLabel} onFinish={finishOnboarding} />
 
       <BottomSheet open={privacyOpen} onOpenChange={(open) => { setPrivacyOpen(open); if (!open) setDangerConfirm(null); }} title={t(dangerConfirm === "leave" ? "privacy.leaveTitle" : dangerConfirm === "delete" ? "privacy.deleteTitle" : "privacy.title")} description={t("privacy.desc")}>

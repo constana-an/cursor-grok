@@ -21,6 +21,7 @@ export const STORAGE_KEYS = {
   milestones: "couple-shop-milestones",
   openingDismissed: "couple-shop-opening-dismissed",
   favourites: "couple-shop-favourites",
+  lastSync: "couple-shop-last-sync",
 } as const;
 
 export const DEFAULT_PROFILE: CoupleProfile = {

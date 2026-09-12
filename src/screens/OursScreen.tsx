@@ -1,6 +1,7 @@
-import { BellIcon, CardStackIcon, DownloadIcon, GearIcon, GlobeIcon, LinkBreak2Icon, LockClosedIcon, PaperPlaneIcon, PersonIcon, ReaderIcon } from "@radix-ui/react-icons";
+import { BellIcon, CardStackIcon, DownloadIcon, GearIcon, GlobeIcon, LinkBreak2Icon, LockClosedIcon, MobileIcon, PaperPlaneIcon, PersonIcon, ReaderIcon, UpdateIcon } from "@radix-ui/react-icons";
 import type { User } from "@supabase/supabase-js";
 import { KeyboardInput } from "../shell";
+import { cleanCodeInput } from "../lib/pairing";
 import { formatStartedOn, relationshipDays } from "../lib/date";
 import { LANG_LABEL } from "../lib/i18n";
 import { appleAuthEnabled, cloudEnabled, membershipEnabled, phoneAuthEnabled } from "../lib/supabase";
@@ -16,7 +17,11 @@ export function OursScreen({
   onEnableNotifications,
   cloudCoupleId,
   inviteCode,
-  onCopyInviteCode,
+  onOpenInvite,
+  onOpenMove,
+  syncDetail,
+  realtime,
+  onSyncNow,
   pairingCode,
   setPairingCode,
   cloudBusy,
@@ -40,7 +45,12 @@ export function OursScreen({
   cloudCoupleId: string | null;
   /** The couple's real invite code; null until a space has actually been created or joined. */
   inviteCode: string | null;
-  onCopyInviteCode: () => void;
+  onOpenInvite: () => void;
+  onOpenMove: () => void;
+  /** How stale the cloud copy is, already in words. */
+  syncDetail: string;
+  realtime: "connecting" | "live" | "dropped";
+  onSyncNow: () => void;
   pairingCode: string;
   setPairingCode: (value: string) => void;
   cloudBusy: boolean;
@@ -89,8 +99,11 @@ export function OursScreen({
           <span className={`setting-state ${push.subscribed ? "on" : ""}`}>{pushNotice.state}</span>
         </button>
       )}
+      {/* Push has no email or SMS fallback to offer, so this says what does
+          happen instead rather than leaving the gap unexplained. */}
+      {!push.subscribed && <p className="settings-note">{t("ours.pushFallback")}</p>}
       {inviteCode && (
-        <button className="setting-row" onClick={onCopyInviteCode}><span className="setting-icon mint"><PaperPlaneIcon /></span><span><strong>{t("ours.invite")}</strong><small>{t("ours.inviteCode", { code: inviteCode })}</small></span><span className="setting-state">{t("ours.copy")}</span></button>
+        <button className="setting-row" onClick={onOpenInvite}><span className="setting-icon mint"><PaperPlaneIcon /></span><span><strong>{t("ours.invite")}</strong><small>{t("ours.inviteDetail", { code: inviteCode })}</small></span><span className="setting-state">{t("ours.inviteState")}</span></button>
       )}
       <button className="setting-row" onClick={onOpenSettings}><span className="setting-icon gold"><GearIcon /></span><span><strong>{t("ours.settings")}</strong><small>{t("ours.settingsDetail")}</small></span><span className="setting-state">{t("ours.settingsState")}</span></button>
       <button className="setting-row" onClick={() => setLang(otherLang)}><span className="setting-icon account"><GlobeIcon /></span><span><strong>{t("ours.language")}</strong><small>{t("ours.languageDetail")}</small></span><span className="setting-state">{LANG_LABEL[otherLang]}</span></button>
@@ -99,6 +112,7 @@ export function OursScreen({
       {membershipEnabled && (
         <button className="setting-row" onClick={onOpenAccount}><span className="setting-icon membership"><CardStackIcon /></span><span><strong>{membership.planName ?? t("ours.planBasic")}</strong><small>{membership.status === "active" ? t("ours.membershipOk") : t("ours.membershipIssue")}</small></span><span className="setting-state">{t("ours.membershipState")}</span></button>
       )}
+      <button className="setting-row" onClick={onOpenMove}><span className="setting-icon identity"><MobileIcon /></span><span><strong>{t("ours.newPhone")}</strong><small>{t("ours.newPhoneDetail")}</small></span><span className="setting-state">{t("ours.newPhoneState")}</span></button>
       <button className="setting-row" onClick={onExport}><span className="setting-icon mint"><DownloadIcon /></span><span><strong>{t("ours.export")}</strong><small>{t("ours.exportDetail")}</small></span><span className="setting-state">{t("ours.exportState")}</span></button>
       <button className="setting-row" onClick={onOpenPrivacy}><span className="setting-icon identity"><ReaderIcon /></span><span><strong>{t("ours.privacy")}</strong><small>{t("ours.privacyDetail")}</small></span><span className="setting-state">{t("ours.view")}</span></button>
       {cloudCoupleId && <button className="setting-row danger-row" onClick={onLeaveCouple}><span className="setting-icon danger"><LinkBreak2Icon /></span><span><strong>{t("ours.unpair")}</strong><small>{t("ours.unpairDetail")}</small></span><span className="setting-state">{t("ours.unpairState")}</span></button>}
@@ -107,10 +121,19 @@ export function OursScreen({
           <div><strong>{t("ours.pairTitle")}</strong><p>{t("ours.pairBody")}</p></div>
           <button className="create-space" disabled={cloudBusy} onClick={onCreateSpace}>{cloudBusy ? t("ours.connecting") : t("ours.createShop")}</button>
           <span className="pair-divider">{t("ours.orEnterCode")}</span>
-          <div className="pair-input-row"><KeyboardInput value={pairingCode} onChange={(event) => setPairingCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder={t("ours.codePlaceholder")} /><button disabled={cloudBusy || pairingCode.length < 6} onClick={onJoinSpace}>{t("ours.join")}</button></div>
+          <div className="pair-input-row"><KeyboardInput value={pairingCode} onChange={(event) => setPairingCode(cleanCodeInput(event.target.value))} inputMode="numeric" placeholder={t("ours.codePlaceholder")} /><button disabled={cloudBusy || pairingCode.length < 6} onClick={onJoinSpace}>{t("ours.join")}</button></div>
         </div>
       )}
-      <div className="cloud-state"><span className={`cloud-dot ${cloudCoupleId ? "online" : ""}`} /><div><strong>{cloudCoupleId ? t("ours.cloudOn") : cloudEnabled ? t("ours.cloudWaiting") : t("ours.cloudLocal")}</strong><p>{cloudCoupleId ? t("ours.cloudOnDetail") : cloudEnabled ? t("ours.cloudWaitingDetail") : t("ours.cloudLocalDetail")}</p></div></div>
+      <div className="cloud-state">
+        <span className={`cloud-dot ${cloudCoupleId && realtime === "live" ? "online" : cloudCoupleId && realtime === "dropped" ? "dropped" : ""}`.trim()} />
+        <div>
+          <strong>{cloudCoupleId ? (realtime === "dropped" ? t("sync.dropped") : t("ours.cloudOn")) : cloudEnabled ? t("ours.cloudWaiting") : t("ours.cloudLocal")}</strong>
+          <p>{cloudCoupleId ? syncDetail : cloudEnabled ? t("ours.cloudWaitingDetail") : t("ours.cloudLocalDetail")}</p>
+        </div>
+        {cloudCoupleId && (
+          <button className="cloud-retry" onClick={onSyncNow} aria-label={t("sync.ariaRetry")}><UpdateIcon /></button>
+        )}
+      </div>
     </section>
   );
 }

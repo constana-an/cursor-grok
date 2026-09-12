@@ -728,3 +728,43 @@ html[lang^="en"] .status-badge { max-width: 92px; white-space: normal; text-alig
    focus-scrolled a control into view. Cards shrink to the track instead; the
    text inside them was already set up to ellipsis. */
 .menu-list > *, .order-list > * { min-width: 0; }
+
+/* ── Pairing by link ──────────────────────────────────────────────────────
+   Reading six digits out loud is the slowest way two people who are already
+   texting each other could do this, so the link and the QR come first and the
+   code stays underneath for when neither works. */
+.invite-sheet { display: grid; gap: 11px; }
+.invite-qr-frame { justify-self: center; width: 196px; height: 196px; padding: 12px; border-radius: 22px; background: #fff; box-shadow: 0 12px 30px rgba(115, 68, 89, .12); }
+.pair-qr { width: 100%; height: 100%; display: block; }
+.invite-scan-hint { margin: 0; color: #786f74; font-size: 11px; text-align: center; line-height: 1.6; }
+.invite-secondary { width: 100%; min-height: 44px; border: 1px solid rgba(235,125,158,.2); border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; background: #fff; color: var(--pink-dark); font-size: 12px; font-weight: 700; }
+.invite-secondary svg { width: 14px; height: 14px; }
+.invite-code-row { min-height: 60px; padding: 10px 12px 10px 16px; border-radius: 18px; display: flex; align-items: center; gap: 10px; background: #fff6f8; }
+.invite-code-row > div { flex: 1; min-width: 0; }
+.invite-code-row small { display: block; color: #7d7076; font-size: 11px; }
+.invite-code-row strong { display: block; margin-top: 2px; color: #6c5e66; font-size: 24px; letter-spacing: .22em; }
+.invite-code-row button { width: 44px; height: 44px; flex: 0 0 44px; border: 0; border-radius: 14px; display: grid; place-items: center; background: #fff; color: var(--pink-dark); }
+.invite-code-row button svg { width: 16px; height: 16px; }
+
+/* ── Changing phones ─────────────────────────────────────────────────────
+   Nothing new happens here; signing in already restores the couple. What was
+   missing was anybody saying so. */
+.move-sheet { display: grid; gap: 12px; }
+.move-steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.move-steps li { display: flex; align-items: flex-start; gap: 11px; color: #6c5e66; font-size: 13px; line-height: 1.65; }
+.move-step-number { width: 24px; height: 24px; flex: 0 0 24px; margin-top: 1px; border-radius: 50%; display: grid; place-items: center; background: #fff0f4; color: var(--pink-dark); font-size: 12px; font-weight: 800; }
+.move-step-number svg { width: 12px; height: 12px; }
+.move-warning { padding: 16px; border-radius: 20px; background: #fff6f8; text-align: center; }
+.move-warning-icon { width: 40px; height: 40px; margin: 0 auto; border-radius: 14px; display: grid; place-items: center; background: #fff; color: var(--pink-dark); }
+.move-warning-icon svg { width: 17px; height: 17px; }
+.move-warning p { margin: 11px 0 14px; color: #6c5e66; font-size: 13px; line-height: 1.7; }
+
+/* A dropped live connection is not the same as a connected one, and the strip
+   used to claim the second whatever had happened to the first. */
+.live-push-strip.is-dropped { background: #6b4450; }
+.settings-note { margin: -2px 4px 0; color: #786f74; font-size: 11px; line-height: 1.65; }
+.cloud-dot.dropped { background: #d9a13f; box-shadow: 0 0 0 4px rgba(217,161,63,.16); }
+.cloud-retry { width: 44px; height: 44px; flex: 0 0 44px; border: 0; border-radius: 14px; display: grid; place-items: center; background: #fff; color: var(--pink-dark); }
+.cloud-retry svg { width: 16px; height: 16px; }
+.cloud-state > div { flex: 1; min-width: 0; }
+.cloud-state .cloud-dot { flex: 0 0 9px; }
