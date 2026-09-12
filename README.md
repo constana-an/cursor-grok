@@ -2,7 +2,6 @@
 
 **A realtime two-player shop where long-distance couples turn small requests into orders paid for with everyday attention.**
 
-![Couple Order Shop on mobile](docs/design/implementation-mobile-screen.jpg)
 
 ## HackCMU 2026
 
