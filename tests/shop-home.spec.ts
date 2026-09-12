@@ -32,7 +32,7 @@ const order = async (page: import("@playwright/test").Page, name: string, catego
   await page.getByRole("button", { name: "小铺", exact: true }).click();
   await page.getByRole("button", { name: category, exact: true }).click();
   await page.getByRole("button", { name: `加入${name}` }).click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
+  await page.getByRole("button", { name: /把这份心意送出去/ }).click();
 };
 
 test("a first run is left to the opening checklist alone", async ({ page }) => {

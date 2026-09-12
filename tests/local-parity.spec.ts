@@ -127,7 +127,7 @@ test("a finished wish lands on the memory timeline by itself", async ({ page }) 
 
   await page.getByRole("button", { name: "小铺", exact: true }).click();
   await page.getByRole("button", { name: "加入缤纷水果茶" }).click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
+  await page.getByRole("button", { name: /把这份心意送出去/ }).click();
   await switchIdentity(page, "二宝");
   await page.getByRole("button", { name: "订单", exact: true }).click();
   await page.getByRole("button", { name: /接单/ }).click();
@@ -234,7 +234,7 @@ test("earlier milestones stay readable after the toast is gone", async ({ page }
     id: "seed-done", itemId: "fruit-tea", itemName: "缤纷水果茶",
     image: "/assets/menu/fruit-tea.png", price: 28, note: "", desiredTime: "尽快",
     from: "大宝", to: "二宝", status: "done",
-    createdAt: "2026-08-01T10:00:00.000Z", completedAt: "2026-08-01T12:00:00.000Z",
+    createdAt: "2026-09-05T10:00:00.000Z", completedAt: "2026-09-05T12:00:00.000Z",
   };
   await enterAs(page, "大宝", {
     "couple-shop-orders": JSON.stringify([done]),

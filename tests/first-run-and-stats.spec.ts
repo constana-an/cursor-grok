@@ -103,7 +103,7 @@ test("the opening checklist carries the first run through to a real order", asyn
 
   // Sending one wish is what finishes the list, so it disappears afterwards.
   await page.getByRole("button", { name: "加入缤纷水果茶" }).click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
+  await page.getByRole("button", { name: /把这份心意送出去/ }).click();
   await expect(checklist).toHaveCount(0);
 });
 

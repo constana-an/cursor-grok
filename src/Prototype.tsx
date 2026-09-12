@@ -1723,7 +1723,7 @@ function CoupleShop() {
       ? { ...order, status, completedAt: completedAt ?? order.completedAt, declineNote: status === "rejected" ? note : order.declineNote }
       : order)));
     if (status === "rejected") showToast(t("toast.declined", { price: target?.price ?? 0, name: target?.from ?? t("toast.partnerFallback") }));
-    else if (status === "done") showToast(t("toast.wishDone"));
+    else if (status === "done") showToast(t("toast.wishDone", { name: localizedPersonName(target?.from ?? t("toast.partnerFallback"), lang) }));
     else showToast(t("toast.orderStatusUpdated", { status: STATUS_TEXT[lang][status] }));
   };
 

@@ -53,10 +53,10 @@ test("the sender pays, cannot answer their own order, and a decline refunds them
   await startWithCoins(page, 200);
 
   await page.getByRole("button", { name: "加入缤纷水果茶" }).click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
+  await page.getByRole("button", { name: /把这份心意送出去/ }).click();
   await page.getByRole("button", { name: "订单", exact: true }).click();
 
-  await expect(page.getByText("等 二宝 接单，婉拒会把甜心币退给你")).toBeVisible();
+  await expect(page.getByText("等 二宝 回应；这次不方便的话，心意会回到你这里")).toBeVisible();
   await expect(page.getByRole("button", { name: /接单/ })).toHaveCount(0);
   expect(await coinBalance(page)).toBe(172);
 
@@ -65,7 +65,7 @@ test("the sender pays, cannot answer their own order, and a decline refunds them
   await page.getByRole("button", { name: /婉拒/ }).click();
   await page.getByLabel(/说一句为什么/).fill("今天太累了，明天补给你");
   await page.getByRole("button", { name: "确认婉拒" }).click();
-  await expect(page.getByText("已婉拒，28 甜心币退回")).toBeVisible();
+  await expect(page.getByText("已经回复大宝了，28 份心意也回到大宝那里")).toBeVisible();
   // The reason travels with the order, so "这次未接单" is not the whole story.
   await page.getByRole("button", { name: "未完成", exact: true }).click();
   await expect(page.getByText("“今天太累了，明天补给你”")).toBeVisible();
@@ -79,7 +79,7 @@ test("the sender pays, cannot answer their own order, and a decline refunds them
 test("a declined order leaves 进行中 and is filed under 未完成", async ({ page }) => {
   await startWithCoins(page, 200);
   await page.getByRole("button", { name: "加入缤纷水果茶" }).click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
+  await page.getByRole("button", { name: /把这份心意送出去/ }).click();
 
   await switchIdentity(page, "二宝");
   await page.getByRole("button", { name: "订单", exact: true }).click();
@@ -93,7 +93,7 @@ test("a declined order leaves 进行中 and is filed under 未完成", async ({ 
 
   await page.getByRole("button", { name: "未完成", exact: true }).click();
   await expect(page.locator(".order-card")).toHaveCount(1);
-  await expect(page.getByText("28 甜心币已退回给 大宝")).toBeVisible();
+  await expect(page.getByText("28 份心意已经回到 大宝 那里")).toBeVisible();
 
   await page.getByRole("button", { name: "已完成", exact: true }).click();
   await expect(page.locator(".order-card")).toHaveCount(0);
@@ -111,7 +111,7 @@ test("the weekly order task unlocks for whoever actually finished the wish", asy
 
   await page.getByRole("button", { name: "小铺", exact: true }).click();
   await page.getByRole("button", { name: "加入缤纷水果茶" }).click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
+  await page.getByRole("button", { name: /把这份心意送出去/ }).click();
 
   await switchIdentity(page, "二宝");
   await page.getByRole("button", { name: "订单", exact: true }).click();
@@ -137,7 +137,7 @@ test("a couple's own wish can be written, ordered and taken back off the menu", 
   await expect(page.getByRole("dialog", { name: "写一个我们的心愿" })).toBeVisible();
   await page.getByLabel("心愿名字").fill("陪我去菜市场");
   await page.getByLabel("一句话介绍").fill("挑晚饭的菜，顺便牵手");
-  await page.getByLabel("要多少甜心币").fill("30");
+  await page.getByLabel("需要多少份心意").fill("30");
   await page.getByRole("button", { name: "上架这个心愿" }).click();
 
   const card = page.locator(".menu-card", { hasText: "陪我去菜市场" });
@@ -145,7 +145,7 @@ test("a couple's own wish can be written, ordered and taken back off the menu", 
   await expect(card.getByText("挑晚饭的菜，顺便牵手")).toBeVisible();
 
   await card.getByRole("button", { name: "加入陪我去菜市场" }).click();
-  await page.getByRole("button", { name: /确认下单 · 30 甜心币/ }).click();
+  await page.getByRole("button", { name: /把这份心意送出去 · 30/ }).click();
   expect(await coinBalance(page)).toBe(170);
 
   // Taking it off the menu must not rewrite the order that already exists.
@@ -163,11 +163,11 @@ test("a custom 去约会 wish counts towards the weekly date task", async ({ pag
   await page.getByRole("button", { name: "去约会", exact: true }).click();
   await page.getByRole("button", { name: /写一个我们自己的心愿/ }).click();
   await page.getByLabel("心愿名字").fill("夜市散步");
-  await page.getByLabel("要多少甜心币").fill("40");
+  await page.getByLabel("需要多少份心意").fill("40");
   await page.getByRole("button", { name: "上架这个心愿" }).click();
 
   await page.getByRole("button", { name: "加入夜市散步" }).click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
+  await page.getByRole("button", { name: /把这份心意送出去/ }).click();
 
   await switchIdentity(page, "二宝");
   await page.getByRole("button", { name: "订单", exact: true }).click();
@@ -187,7 +187,7 @@ test("the sender can withdraw an unanswered wish, and gets the coins back", asyn
   await startWithCoins(page, 200);
   await page.getByRole("button", { name: "限定券", exact: true }).click();
   await page.getByRole("button", { name: "加入今天吃什么我决定" }).click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
+  await page.getByRole("button", { name: /把这份心意送出去/ }).click();
   expect(await coinBalance(page)).toBe(80);
 
   const card = page.locator(".menu-card", { hasText: "今天吃什么我决定" });
@@ -195,7 +195,7 @@ test("the sender can withdraw an unanswered wish, and gets the coins back", asyn
 
   await page.getByRole("button", { name: "订单", exact: true }).click();
   await page.getByRole("button", { name: /撤回这个心愿/ }).click();
-  await expect(page.getByText("已撤回，120 甜心币退回给你")).toBeVisible();
+  await expect(page.getByText("已撤回，120 份心意回到你这里")).toBeVisible();
   expect(await coinBalance(page)).toBe(200);
 
   await expect(page.locator(".order-card")).toHaveCount(0);
@@ -210,7 +210,7 @@ test("the sender can withdraw an unanswered wish, and gets the coins back", asyn
 
   // Only the sender may withdraw, and only while it is unanswered.
   await page.getByRole("button", { name: "加入今天吃什么我决定" }).click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
+  await page.getByRole("button", { name: /把这份心意送出去/ }).click();
   await switchIdentity(page, "二宝");
   await page.getByRole("button", { name: "订单", exact: true }).click();
   await expect(page.getByRole("button", { name: /撤回这个心愿/ })).toHaveCount(0);
@@ -219,7 +219,7 @@ test("the sender can withdraw an unanswered wish, and gets the coins back", asyn
 test("a notification link lands on its own order, whatever tab it belongs to", async ({ page }) => {
   await startWithCoins(page, 200);
   await page.getByRole("button", { name: "加入缤纷水果茶" }).click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
+  await page.getByRole("button", { name: /把这份心意送出去/ }).click();
 
   await switchIdentity(page, "二宝");
   await page.getByRole("button", { name: "订单", exact: true }).click();
@@ -240,7 +240,7 @@ test("a spent limited coupon stays visibly used", async ({ page }) => {
   await startWithCoins(page, 200);
   await page.getByRole("button", { name: "限定券", exact: true }).click();
   await page.getByRole("button", { name: "加入今天吃什么我决定" }).click();
-  await page.getByRole("button", { name: /确认下单/ }).click();
+  await page.getByRole("button", { name: /把这份心意送出去/ }).click();
 
   const card = page.locator(".menu-card", { hasText: "今天吃什么我决定" });
   await expect(card.getByText("已使用")).toBeVisible();
@@ -250,14 +250,15 @@ test("a spent limited coupon stays visibly used", async ({ page }) => {
 test("a wish beyond the wallet says so before the note is written", async ({ page }) => {
   await startWithCoins(page, 8);
 
-  // Regression: every card looked orderable, and "甜心币不够啦" only arrived as
+  // Regression: every card looked orderable, and "心意还差一点点" only arrived as
   // a toast after picking a time and typing a message.
   const card = page.locator(".menu-card", { hasText: "缤纷水果茶" });
-  await expect(card.getByText("还差 20 币")).toBeVisible();
+  await expect(card.getByText("再攒 20 份心意")).toBeVisible();
 
   await page.getByRole("button", { name: "加入缤纷水果茶" }).click();
-  await expect(page.getByText("还差 20 甜心币")).toBeVisible();
-  await expect(page.getByRole("button", { name: /确认下单/ })).toHaveCount(0);
+  // The card and the sheet now say the same sentence, so this one is scoped.
+  await expect(page.locator(".order-short").getByText("再攒 20 份心意")).toBeVisible();
+  await expect(page.getByRole("button", { name: /把这份心意送出去/ })).toHaveCount(0);
   // The sheet offers the way out rather than a dead end.
-  await expect(page.getByRole("button", { name: /去连接|去做任务赚币/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /去连接|去做任务攒心意/ })).toBeVisible();
 });

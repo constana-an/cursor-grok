@@ -150,7 +150,10 @@ export function MemoriesScreen({
       )}
       <div className="checkin-card">
         <span className="checkin-flame"><SunIcon /></span>
-        <div><small>{t("memories.streak")}</small><strong>{t("memories.streakDays", { days: checkin.streak })}</strong><p>{t("memories.checkinHint")}</p></div>
+        {/* A broken streak is not a reproach. The number stays honest, but what
+            sits under it says the run can start again rather than mourning the
+            one that ended. */}
+        <div><small>{t("memories.streak")}</small><strong>{t("memories.streakDays", { days: checkin.streak })}</strong><p>{checkin.streak === 0 ? t("memories.streakNone") : t("memories.checkinHint")}</p></div>
         <button disabled={checkin.checkedToday} onClick={onCheckin}>{checkin.checkedToday ? t("memories.checkedToday") : t("memories.checkin")}</button>
       </div>
       <div className="memory-section-heading">
