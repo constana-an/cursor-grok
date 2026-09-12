@@ -675,3 +675,56 @@ html[lang^="en"] .status-badge { max-width: 92px; white-space: normal; text-alig
 .order-short strong { display: block; color: #b5506f; font-size: 15px; }
 .order-short p { margin: 6px 0 12px; color: #7d6e75; font-size: 12px; line-height: 1.7; }
 .order-short .submit-order { margin: 0; }
+
+/* ── 此刻 ─────────────────────────────────────────────────────────────────
+   The first thing on the shop page, above the wallet: what the other person is
+   waiting for matters more than how many coins are left. Every card is white so
+   the text sits on a surface the contrast probe can actually measure; the kind
+   of moment is carried by the icon, not by tinting the copy's backdrop. */
+.moments { margin-top: 12px; display: grid; gap: 9px; }
+.moment-card { min-height: 68px; padding: 11px 12px; border: 1px solid rgba(240,111,148,.10); border-radius: 22px; display: flex; align-items: center; gap: 10px; background: #fff; box-shadow: 0 11px 28px rgba(115, 68, 89, .07); }
+.moment-icon { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 14px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, #ff9bb5, #f16c93); }
+.moment-icon svg { width: 18px; height: 18px; }
+.moment-card.is-promised .moment-icon { background: linear-gradient(145deg, #8ed9c5, #4fbda1); }
+.moment-card.is-anniversary .moment-icon { background: linear-gradient(145deg, #c3b4f2, #9a83e0); }
+.moment-art { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 15px; overflow: hidden; display: grid; place-items: center; }
+.moment-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.moment-tag { color: var(--pink-dark); font-size: 11px; font-weight: 700; }
+.moment-copy strong { margin-top: 3px; color: #6c5e66; font-size: 14px; letter-spacing: -.01em; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.moment-copy small { margin-top: 3px; color: #786f74; font-size: 11px; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.moment-cta { min-height: 44px; min-width: 44px; flex: 0 0 auto; padding: 0 13px; border: 0; border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 5px; background: linear-gradient(135deg, #ff95b1, #ef6b92); color: #fff; font-size: 12px; font-weight: 700; box-shadow: 0 8px 18px rgba(235,93,136,.2); }
+.moment-cta svg { width: 13px; height: 13px; }
+.moment-cta.is-quiet { background: #fff0f4; color: var(--pink-dark); box-shadow: none; }
+.moment-card.is-promised .moment-cta { background: linear-gradient(135deg, #8ed9c5, #55bfa4); }
+.moment-card.is-anniversary .moment-cta { background: linear-gradient(135deg, #b8a7ef, #8f77db); }
+.moment-cta:active { transform: scale(.96); }
+
+/* ── 我们的固定项目 ────────────────────────────────────────────────────────
+   Starred wishes first, then whatever this person orders often enough to be a
+   habit. It only exists once there is something to put in it. */
+.pinned-section { margin-top: 18px; }
+.pinned-carousel { margin: 11px -18px 0; }
+.pinned-track { padding: 0 18px; gap: 9px; }
+.pinned-card { flex: 0 0 auto; width: 112px; min-height: 132px; padding: 10px; border: 1px solid rgba(240,111,148,.10); border-radius: 20px; display: flex; flex-direction: column; align-items: center; gap: 7px; background: #fff; box-shadow: 0 9px 22px rgba(115, 68, 89, .06); }
+.pinned-art { width: 56px; height: 56px; flex: 0 0 56px; border-radius: 18px; overflow: hidden; display: grid; place-items: center; }
+.pinned-card strong { width: 100%; color: #6c5e66; font-size: 12px; text-align: center; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.pinned-price { margin-top: auto; padding: 3px 8px; border-radius: 99px; display: flex; align-items: center; gap: 4px; background: #fff0f4; color: var(--pink-dark); font-size: 11px; font-weight: 800; }
+.pinned-price svg { width: 11px; height: 11px; }
+.pinned-hint { margin: 9px 0 0; color: #786f74; font-size: 11px; line-height: 1.6; }
+.pinned-tag { padding: 3px 7px; border-radius: 99px; background: #f0eaff; color: #785da3; font-size: 11px; white-space: nowrap; }
+
+/* The star and the add button share a column, so both keep their 44pt target. */
+.menu-actions { flex: 0 0 44px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.pin-button { width: 44px; height: 44px; flex: 0 0 44px; border: 0; border-radius: 50%; display: grid; place-items: center; background: transparent; color: #9c8792; }
+.pin-button svg { width: 19px; height: 19px; }
+.pin-button.is-on { color: var(--pink-dark); }
+.pin-button:active { transform: scale(.92); }
+.menu-history { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* A grid item's automatic minimum size is its min-content width, and every menu
+   card holds a nowrap title and a nowrap description. In English those are wide
+   enough that the card refused to shrink into its own column, so the app
+   viewport itself could be scrolled sideways — 90px of it — as soon as anything
+   focus-scrolled a control into view. Cards shrink to the track instead; the
+   text inside them was already set up to ellipsis. */
+.menu-list > *, .order-list > * { min-width: 0; }

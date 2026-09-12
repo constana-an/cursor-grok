@@ -25,6 +25,8 @@ import { STATUS_TEXT, categoryMeta, desiredTimes, earnedInWeek, localizeDesiredT
 import { dayKeyOf, formatStartedOn, isValidDateKey, normalizeDateInput, relationshipDays, todayKey } from "./lib/date";
 import { checkinStatusFrom, checkinStreak, dueAnniversaries } from "./lib/date";
 import { authErrorMessage, orderErrorMessage, orderStatusErrorMessage, rewardErrorMessage, wishErrorMessage } from "./lib/errors";
+import { orderHistory, pinnedItems } from "./lib/history";
+import { buildMoments } from "./lib/moments";
 import { LanguageProvider, useI18n } from "./i18n";
 import { LANGS, LANG_LABEL } from "./lib/i18n";
 import type { TKey } from "./lib/i18n";
@@ -40,6 +42,11 @@ import {
   loadCoupleProfile,
   loadEconomyCoins,
   loadCustomItems,
+  loadFavourites,
+  favouritesKey,
+  localizedPersonName,
+  localizedProfile,
+  toggleFavourite,
   loadIdentity,
   loadLocalAnniversaries,
   loadLocalOrders,
@@ -68,6 +75,7 @@ import type {
 } from "./lib/types";
 import { MemoriesScreen } from "./screens/MemoriesScreen";
 import { MenuArt } from "./screens/MenuArt";
+import { MomentsSection } from "./screens/MomentsSection";
 import { OnboardingSheet, PAIRING_BONUS } from "./screens/OnboardingSheet";
 import { OpeningProgress, type OpeningStep } from "./screens/OpeningProgress";
 import { OrdersScreen } from "./screens/OrdersScreen";
@@ -270,6 +278,7 @@ function CoupleShop() {
     setWallet((current) => ({ ...current, claims: typeof next === "function" ? next(current.claims) : next }));
   }, []);
   const [customItems, setCustomItems] = useState<MenuItem[]>(loadCustomItems);
+  const [favourites, setFavourites] = useState<string[]>(() => loadFavourites(loadIdentity()));
   const [wishOpen, setWishOpen] = useState(false);
   const [wishDraft, setWishDraft] = useState<{ name: string; description: string; price: string; category: Category }>(
     { name: "", description: "", price: "48", category: "food" },
@@ -347,8 +356,14 @@ function CoupleShop() {
   const previousNames = useRef<{ first: string; second: string } | null>(null);
 
   const partnerIdentity = identity ? partnerFor(identity) : null;
+  // Canonical names: what an order row records, and what "only the recipient
+  // may answer" is checked against. Never localised, or the two phones would
+  // disagree about who an order belongs to.
   const currentName = identity ? displayNameFor(profile, identity) : null;
   const partnerName = partnerIdentity ? displayNameFor(profile, partnerIdentity) : null;
+  // What the reader sees. Identical to the above until a default name meets an
+  // English reader, and identical again the moment either person renames.
+  const shownProfile = useMemo(() => localizedProfile(profile, lang), [profile, lang]);
   const activeOrders = useMemo(
     () => orders.filter((order) => !["done", "rejected"].includes(order.status)).length,
     [orders],
@@ -359,9 +374,21 @@ function CoupleShop() {
     const released = new Set<OrderStatus>(["rejected", "cancelled"]);
     return [...new Set(orders.filter((order) => !released.has(order.status) && limited.has(order.itemId)).map((order) => order.itemId))];
   }, [orders]);
+  // Everything personalised about the shop is derived from the order list that
+  // is already on screen: no new table, nothing to synchronise, nothing stale.
+  const history = useMemo(() => orderHistory(orders, currentName ?? ""), [orders, currentName]);
+  const pinned = useMemo(
+    () => pinnedItems({ menu: MENU, customItems, favouriteIds: favourites, history, usedLimitedIds }),
+    [customItems, favourites, history, usedLimitedIds],
+  );
+  const moments = useMemo(
+    () => buildMoments({ orders, anniversaries, currentName: currentName ?? "", coins, history }),
+    [orders, anniversaries, currentName, coins, history],
+  );
+
   const identityOptions: Array<{ name: Identity; displayName: string; tone: "pink" | "mint" }> = [
-    { name: "大宝", displayName: profile.firstName, tone: "pink" },
-    { name: "二宝", displayName: profile.secondName, tone: "mint" },
+    { name: "大宝", displayName: shownProfile.firstName, tone: "pink" },
+    { name: "二宝", displayName: shownProfile.secondName, tone: "mint" },
   ];
 
   const showToast = useCallback((message: string) => {
@@ -674,6 +701,12 @@ function CoupleShop() {
     if (!identity || cloudCoupleId) return;
     setWallet((current) => (current.owner === identity ? current : walletFor(identity)));
   }, [identity, cloudCoupleId]);
+
+  // Starred wishes are personal too, and unlike the wallet they are local in
+  // both modes, so this one is not gated on being unpaired.
+  useEffect(() => {
+    setFavourites(loadFavourites(identity));
+  }, [identity]);
 
   useEffect(() => {
     const channel = new BroadcastChannel("couple-order-shop");
@@ -1394,7 +1427,7 @@ function CoupleShop() {
   };
 
   const openSettings = () => {
-    setProfileDraft(profile);
+    setProfileDraft(localizedProfile(profile, lang));
     setSettingsOpen(true);
   };
 
@@ -1435,6 +1468,23 @@ function CoupleShop() {
   const switchIdentity = () => {
     localStorage.removeItem(STORAGE_KEYS.identity);
     setIdentity(null);
+  };
+
+  const toggleFavouriteItem = (item: MenuItem) => {
+    if (!identity) return;
+    const next = toggleFavourite(favourites, item.id);
+    setFavourites(next);
+    try {
+      localStorage.setItem(favouritesKey(identity), JSON.stringify(next));
+    } catch {
+      // A blocked storage must not stop the star from filling in on screen.
+    }
+  };
+
+  /** 此刻 points at one order; the orders page has to widen its own filter. */
+  const openOrderFromMoment = (orderId: string) => {
+    setFocusOrderId(orderId);
+    setView("orders");
   };
 
   const chooseRandom = () => {
@@ -1499,8 +1549,8 @@ function CoupleShop() {
       // then discard the invoke's error entirely.
       showToast(t("toast.orderPlaced"));
       const notice = await notifyPartner(client, order.id, "order.created");
-      if (notice && notice.delivered > 0) showToast(t("toast.orderNotified", { partner: partnerName }));
-      else if (notice && notice.subscribed === 0) showToast(t("toast.orderNoPush", { partner: partnerName }));
+      if (notice && notice.delivered > 0) showToast(t("toast.orderNotified", { partner: partnerLabel }));
+      else if (notice && notice.subscribed === 0) showToast(t("toast.orderNoPush", { partner: partnerLabel }));
       return;
     }
     if (usedLimitedIds.includes(selected.id)) return showToast(t("toast.limitedUsed"));
@@ -1594,7 +1644,7 @@ function CoupleShop() {
     if (!registration || !vapidPublicKey()) return showToast(t("toast.notifLocalOnly"));
     // Reachable before an identity has been chosen, where there is no partner
     // to name yet — the old template literal printed a literal "null" here.
-    const them = partnerName ?? t("toast.partnerFallback");
+    const them = partnerLabel ?? t("toast.partnerFallback");
     if (!client || !cloudCoupleId || !authUser) return showToast(t("toast.notifNeedPair", { partner: them }));
     try {
       const subscription = await registration.pushManager.subscribe({
@@ -1675,7 +1725,7 @@ function CoupleShop() {
           <main className="identity-login" aria-label={t("identity.aria")}>
             <div className="identity-brand">
               <span><HeartFilledIcon /></span>
-              <strong>{profile.shopName}</strong>
+              <strong>{shownProfile.shopName}</strong>
               {/* This is the first screen anyone sees, so the switch has to be
                   here too — otherwise an English reader has to guess their way
                   through a Chinese identity choice to reach the setting. */}
@@ -1692,7 +1742,7 @@ function CoupleShop() {
                 ))}
               </div>
             </div>
-            <div className="identity-welcome"><span>{profile.firstName} & {profile.secondName}</span><h1>{t("identity.question")}</h1><p>{t("identity.hint")}</p></div>
+            <div className="identity-welcome"><span>{shownProfile.firstName} & {shownProfile.secondName}</span><h1>{t("identity.question")}</h1><p>{t("identity.hint")}</p></div>
             <div className="identity-options">
               {identityOptions.map((option) => (
                 <button key={option.name} className={`identity-choice ${option.tone}`} onClick={() => { chooseIdentity(option.name); setView("shop"); }}>
@@ -1709,16 +1759,19 @@ function CoupleShop() {
     );
   }
 
+  const currentLabel = localizedPersonName(currentName, lang);
+  const partnerLabel = localizedPersonName(partnerName, lang);
+
   const syncState = cloudCoupleId
-    ? { title: t("sync.connected", { partner: partnerName }), detail: t("sync.connectedDetail"), live: true }
+    ? { title: t("sync.connected", { partner: partnerLabel }), detail: t("sync.connectedDetail"), live: true }
     : cloudEnabled
-      ? { title: t("sync.waiting", { partner: partnerName }), detail: t("sync.waitingDetail"), live: false }
+      ? { title: t("sync.waiting", { partner: partnerLabel }), detail: t("sync.waitingDetail"), live: false }
       : { title: t("sync.local"), detail: t("sync.localDetail"), live: false };
 
   // The cloud steps only exist for a build that has a project behind it; on a
   // local install the checklist is honestly two steps long.
   const openingSteps: OpeningStep[] = [
-    { id: "identity", title: t("opening.identity", { name: currentName }), detail: t("opening.identityDetail"), done: true },
+    { id: "identity", title: t("opening.identity", { name: currentLabel }), detail: t("opening.identityDetail"), done: true },
     ...(cloudEnabled ? [
       {
         id: "account",
@@ -1731,7 +1784,7 @@ function CoupleShop() {
       {
         id: "pair",
         title: t("opening.pair"),
-        detail: t("opening.pairDetail", { partner: partnerName }),
+        detail: t("opening.pairDetail", { partner: partnerLabel }),
         done: Boolean(cloudCoupleId),
         action: () => setView("ours"),
         cta: t("opening.pairCta"),
@@ -1761,7 +1814,7 @@ function CoupleShop() {
     {
       id: "order",
       title: t("opening.firstOrder"),
-      detail: t("opening.firstOrderDetail", { partner: partnerName }),
+      detail: t("opening.firstOrderDetail", { partner: partnerLabel }),
       done: orders.length > 0,
       action: () => setView("shop"),
       cta: t("opening.firstOrderCta"),
@@ -1774,7 +1827,7 @@ function CoupleShop() {
         <main className="screen-content couple-shop" aria-label={t("app.aria")} onPointerDown={dismissKeyboardOnOutsideTap}>
           <header className="top-bar">
             <div className="brand-mark"><HeartFilledIcon /></div>
-            <div className="brand-copy"><span>{profile.firstName} & {profile.secondName}</span><h1>{profile.shopName}</h1></div>
+            <div className="brand-copy"><span>{shownProfile.firstName} & {shownProfile.secondName}</span><h1>{shownProfile.shopName}</h1></div>
             <button className="bell-button" onClick={() => setView("orders")} aria-label={t("app.viewOrders")}><BellIcon />{activeOrders > 0 && <span>{activeOrders}</span>}</button>
           </header>
           {/* Not a sign when it is also the fix: unpaired, this line is the
@@ -1796,6 +1849,18 @@ function CoupleShop() {
               setOpeningDismissed(true);
             }} />
           )}
+          {/* Above the wallet on purpose: what the other person is waiting for
+              matters more than how many coins are left. */}
+          {view === "shop" && partnerName && (
+            <MomentsSection
+              moments={moments}
+              partnerName={partnerLabel}
+              onOpenOrders={openOrderFromMoment}
+              onPlanDate={() => { setCategory("date"); setView("shop"); }}
+              onOrder={setSelected}
+              onEarn={() => setView("tasks")}
+            />
+          )}
           <section className="wallet-card">
             <div className="coin-count"><HeartFilledIcon /><strong>{coins}</strong><span>{t("app.coin", { count: coins })}</span></div>
             <button className="earn-link" onClick={() => setView("tasks")}><CheckCircledIcon /><span>{t("app.earnCoins")}</span></button>
@@ -1812,6 +1877,10 @@ function CoupleShop() {
               onAddCustom={openAddWish}
               onEditCustom={openEditWish}
               coins={coins}
+              pinned={pinned}
+              favouriteIds={favourites}
+              onToggleFavourite={toggleFavouriteItem}
+              history={history}
             />
           )}
           {view === "tasks" && (
@@ -1842,7 +1911,7 @@ function CoupleShop() {
           {view === "memories" && (
             <MemoriesScreen
               orders={orders}
-              profile={profile}
+              profile={shownProfile}
               memories={memories}
               anniversaries={anniversaries}
               checkin={cloudCoupleId ? checkin : checkinStatusFrom(wallet.checkins)}
@@ -1860,7 +1929,7 @@ function CoupleShop() {
           {view === "ours" && (
             <OursScreen
               identity={identity}
-              partnerName={partnerName}
+              partnerName={partnerLabel}
               onSwitchIdentity={switchIdentity}
               push={pushState}
               onEnableNotifications={enableNotifications}
@@ -1872,7 +1941,7 @@ function CoupleShop() {
               cloudBusy={cloudBusy}
               onCreateSpace={createCloudSpace}
               onJoinSpace={joinCloudSpace}
-              profile={profile}
+              profile={shownProfile}
               onOpenSettings={openSettings}
               authUser={authUser}
               onOpenAccount={openAccount}
@@ -1917,7 +1986,7 @@ function CoupleShop() {
                 <strong>{t("order.short", { count: selected.price - coins })}</strong>
                 <p>
                   {cloudEnabled && !cloudCoupleId
-                    ? t("order.shortPair", { partner: partnerName, bonus: PAIRING_BONUS })
+                    ? t("order.shortPair", { partner: partnerLabel, bonus: PAIRING_BONUS })
                     : t("order.shortTasks")}
                 </p>
                 <button
@@ -1927,7 +1996,7 @@ function CoupleShop() {
                     setView(cloudEnabled && !cloudCoupleId ? "ours" : "tasks");
                   }}
                 >
-                  {cloudEnabled && !cloudCoupleId ? t("order.goPair", { partner: partnerName }) : t("order.goTasks")}
+                  {cloudEnabled && !cloudCoupleId ? t("order.goPair", { partner: partnerLabel }) : t("order.goTasks")}
                 </button>
               </div>
             ) : (
@@ -2078,11 +2147,11 @@ function CoupleShop() {
             <h3>{memoryDetail.caption}</h3>
             <p>{memoryDetail.happenedOn}</p>
             {memoryDetail.createdBy && authUser && memoryDetail.createdBy !== authUser.id ? (
-              <p className="memory-detail-note">{t("memory.partnerOwned", { partner: partnerName })}</p>
+              <p className="memory-detail-note">{t("memory.partnerOwned", { partner: partnerLabel })}</p>
             ) : confirmDelete === "memory" ? (
               <div className="delete-confirm">
                 <strong>{t("common.deleteIrreversible")}</strong>
-                <p>{t("memory.deleteBody", { partner: partnerName })}</p>
+                <p>{t("memory.deleteBody", { partner: partnerLabel })}</p>
                 <button className="account-danger" disabled={cloudBusy} onClick={() => deleteMemory(memoryDetail)}>{t(cloudBusy ? "common.deleting" : "common.confirmDelete")}</button>
                 <button className="account-secondary" onClick={() => setConfirmDelete(null)}>{t("common.thinkAgain")}</button>
               </div>
@@ -2145,7 +2214,7 @@ function CoupleShop() {
         </div>
       </BottomSheet>
 
-      <OnboardingSheet open={onboardingOpen} partnerName={partnerName} onFinish={finishOnboarding} />
+      <OnboardingSheet open={onboardingOpen} partnerName={partnerLabel} onFinish={finishOnboarding} />
 
       <BottomSheet open={privacyOpen} onOpenChange={(open) => { setPrivacyOpen(open); if (!open) setDangerConfirm(null); }} title={t(dangerConfirm === "leave" ? "privacy.leaveTitle" : dangerConfirm === "delete" ? "privacy.deleteTitle" : "privacy.title")} description={t("privacy.desc")}>
         <div className="privacy-sheet">

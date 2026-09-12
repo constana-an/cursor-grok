@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 const { LANGS, STRINGS, translate } = await import("../src/lib/i18n.ts");
+const { DEFAULT_PROFILE, DEFAULT_PROFILE_EN, localizedPersonName, localizedProfile } = await import("../src/lib/storage.ts");
 const {
   MENU,
   TASKS,
@@ -120,4 +121,23 @@ test("words the couple wrote themselves are never restated", () => {
   // come back exactly as written whichever language is on screen.
   assert.equal(localizedItemName({ itemId: "custom-123", itemName: "陪我去菜市场" }, "en"), "陪我去菜市场");
   assert.equal(localizeDesiredTime("周六下午三点", "en"), "周六下午三点");
+});
+
+test("the shipped default names are the shop's words, and carry both languages", () => {
+  // Nobody typed 大宝 / 二宝 / 我们的小铺 — they are what a brand-new shop is
+  // handed, so they are shipped copy and read in the reader's language.
+  assert.equal(localizedPersonName(DEFAULT_PROFILE.firstName, "en"), DEFAULT_PROFILE_EN.firstName);
+  assert.equal(localizedPersonName(DEFAULT_PROFILE.secondName, "en"), DEFAULT_PROFILE_EN.secondName);
+  assert.equal(localizedPersonName(DEFAULT_PROFILE.firstName, "zh"), DEFAULT_PROFILE.firstName);
+
+  const shown = localizedProfile({ ...DEFAULT_PROFILE, startedOn: "2026-01-01" }, "en");
+  assert.equal(shown.shopName, DEFAULT_PROFILE_EN.shopName);
+  assert.equal(shown.startedOn, "2026-01-01");
+});
+
+test("a name either of them typed is never restated, in either direction", () => {
+  assert.equal(localizedPersonName("阿梨", "en"), "阿梨");
+  assert.equal(localizedPersonName("Sweetie", "zh"), "Sweetie");
+  const renamed = localizedProfile({ shopName: "梨子铺", firstName: "阿梨", secondName: "小满", startedOn: "2026-01-01" }, "en");
+  assert.deepEqual(renamed, { shopName: "梨子铺", firstName: "阿梨", secondName: "小满", startedOn: "2026-01-01" });
 });

@@ -3,6 +3,7 @@ import { CalendarIcon, CameraIcon, HeartFilledIcon, ImageIcon, LockClosedIcon, P
 import { dayKeyOf, daysUntilAnniversary, formatMonthKey, formatStartedOn, isPastOneOff, monthKeyOf, relationshipDays, thisMonthKey } from "../lib/date";
 import { localizedItemName, localizedMilestone, milestoneUnitOf, nextMilestone, reachedMilestones } from "../lib/catalog";
 import { localeOf, type Lang } from "../lib/i18n";
+import { localizedPersonName } from "../lib/storage";
 import { cloudEnabled } from "../lib/supabase";
 import { useI18n } from "../i18n";
 import { MenuArt } from "./MenuArt";
@@ -234,7 +235,7 @@ export function MemoriesScreen({
                   <li key={order.id}>
                     <span className="timeline-art"><MenuArt item={order} /></span>
                     <div>
-                      <small>{t("memories.timelineLine", { date: dayKeyOf(order.completedAt ?? order.createdAt) ?? "", to: order.to, from: order.from })}</small>
+                      <small>{t("memories.timelineLine", { date: dayKeyOf(order.completedAt ?? order.createdAt) ?? "", to: localizedPersonName(order.to, lang), from: localizedPersonName(order.from, lang) })}</small>
                       <strong>{localizedItemName(order, lang)}</strong>
                       {order.note && <p>“{order.note}”</p>}
                     </div>

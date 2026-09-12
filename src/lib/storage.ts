@@ -1,4 +1,5 @@
 import { isValidDateKey, todayKey } from "./date.ts";
+import type { Lang } from "./i18n.ts";
 import { IDENTITIES } from "./types.ts";
 import type { Anniversary, CoupleProfile, Identity, MenuItem, Order } from "./types.ts";
 
@@ -19,6 +20,7 @@ export const STORAGE_KEYS = {
   reminded: "couple-shop-reminded",
   milestones: "couple-shop-milestones",
   openingDismissed: "couple-shop-opening-dismissed",
+  favourites: "couple-shop-favourites",
 } as const;
 
 export const DEFAULT_PROFILE: CoupleProfile = {
@@ -27,6 +29,45 @@ export const DEFAULT_PROFILE: CoupleProfile = {
   secondName: "二宝",
   startedOn: todayKey(),
 };
+
+/**
+ * The same three defaults in English.
+ *
+ * 大宝 / 二宝 / 我们的小铺 are the *shop's* words, not the couple's: nobody typed
+ * them, they are what a brand-new shop is handed. So they are shipped copy like
+ * a menu item is, and like a menu item they carry both languages — an English
+ * reader should not be introduced to their partner in a script they may not
+ * read. The moment either person edits a name it stops being a default and is
+ * never restated again, in either direction.
+ *
+ * What is *stored* stays Chinese, here and in `public.couples`, because an
+ * order row records who sent it by name and both phones have to agree on that
+ * string whatever language each of them is reading in. This is the display
+ * layer only — the same split `localizedItemName` makes for the menu.
+ */
+export const DEFAULT_PROFILE_EN = {
+  shopName: "Our Little Shop",
+  firstName: "Sweetie",
+  secondName: "Honey",
+} as const;
+
+/** A shipped default in the reader's language; a typed name is left alone. */
+export function localizedPersonName(name: string, lang: Lang): string {
+  if (lang !== "en") return name;
+  if (name === DEFAULT_PROFILE.firstName) return DEFAULT_PROFILE_EN.firstName;
+  if (name === DEFAULT_PROFILE.secondName) return DEFAULT_PROFILE_EN.secondName;
+  return name;
+}
+
+export function localizedProfile(profile: CoupleProfile, lang: Lang): CoupleProfile {
+  if (lang !== "en") return profile;
+  return {
+    ...profile,
+    shopName: profile.shopName === DEFAULT_PROFILE.shopName ? DEFAULT_PROFILE_EN.shopName : profile.shopName,
+    firstName: localizedPersonName(profile.firstName, lang),
+    secondName: localizedPersonName(profile.secondName, lang),
+  };
+}
 
 export function loadCoupleProfile(): CoupleProfile {
   try {
@@ -146,6 +187,37 @@ export function loadCelebratedMilestones(identity: Identity | null): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Starred wishes, per identity like the wallet.
+ *
+ * They are personal on purpose: 置顶 is one person saying "this is the one I
+ * keep asking for", and two people rarely keep asking for the same thing. They
+ * grant nothing and cost nothing, so a device-local list is the honest home for
+ * them — there is no couple-wide state here to get out of sync.
+ */
+export const favouritesKey = (identity: Identity) => `${STORAGE_KEYS.favourites}:${identity}`;
+
+/** A rail, not an archive: past this many the pinned row stops being a shortcut. */
+export const FAVOURITE_LIMIT = 8;
+
+export function loadFavourites(identity: Identity | null): string[] {
+  if (!identity) return [];
+  try {
+    const saved = JSON.parse(localStorage.getItem(favouritesKey(identity)) ?? "[]") as unknown;
+    if (!Array.isArray(saved)) return [];
+    const ids = saved.filter((value): value is string => typeof value === "string" && value.length > 0);
+    return [...new Set(ids)].slice(0, FAVOURITE_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+/** Newest star first, so the most recent decision sits at the head of the rail. */
+export function toggleFavourite(ids: readonly string[], itemId: string): string[] {
+  if (ids.includes(itemId)) return ids.filter((id) => id !== itemId);
+  return [itemId, ...ids].slice(0, FAVOURITE_LIMIT);
 }
 
 export const remindedKey = (anniversaryId: string, day: string) => `${STORAGE_KEYS.reminded}:${anniversaryId}:${day}`;

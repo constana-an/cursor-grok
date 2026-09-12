@@ -11,7 +11,7 @@
     "test:sites": "node --test tests/sites-worker.test.mjs",
     "test:sql": "node --test tests/sql-policies.test.mjs",
     "test:cloud": "node --test tests/cloud-integration.test.mjs",
-    "test:logic": "TZ=America/New_York node --test tests/date-logic.test.mjs tests/wallet-storage.test.mjs tests/milestones.test.mjs tests/task-requirements.test.mjs tests/i18n.test.mjs && TZ=Asia/Shanghai node --test tests/date-logic.test.mjs tests/wallet-storage.test.mjs tests/milestones.test.mjs tests/task-requirements.test.mjs tests/i18n.test.mjs",
+    "test:logic": "TZ=America/New_York node --test tests/date-logic.test.mjs tests/wallet-storage.test.mjs tests/milestones.test.mjs tests/task-requirements.test.mjs tests/moments.test.mjs tests/i18n.test.mjs && TZ=Asia/Shanghai node --test tests/date-logic.test.mjs tests/wallet-storage.test.mjs tests/milestones.test.mjs tests/task-requirements.test.mjs tests/moments.test.mjs tests/i18n.test.mjs",
     "test": "npm run check:runtime && npm run check:migrations && npm run test:logic && npm run test:sql && npm run test:sites && npm run test:runtime",
     "predev": "npm run check:runtime",
     "dev": "vite",

@@ -28,10 +28,15 @@ test("a new device opens in English and switches from the very first screen", as
   // Nothing is guessed from the browser's locale: the shop is English until
   // somebody says otherwise.
   await expect(page.getByRole("heading", { name: "Who's ordering today?" })).toBeVisible();
+  // The two shipped default names are the shop's words, not the couple's, so
+  // an English reader is introduced to their partner in English.
+  await expect(page.getByRole("button", { name: /I'm Sweetie/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /I'm Honey/ })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "en-US");
 
   await page.getByRole("button", { name: "中文", exact: true }).click();
   await expect(page.getByRole("heading", { name: "今天是谁来点单？" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /我是大宝/ })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
 
   // The choice belongs to the device, so it has to survive a cold launch.
@@ -41,7 +46,7 @@ test("a new device opens in English and switches from the very first screen", as
 
 test("the default reaches every screen, and the Us row turns it over", async ({ page }) => {
   await fresh(page);
-  await page.getByRole("button", { name: /I'm 大宝/ }).click();
+  await page.getByRole("button", { name: /I'm Sweetie/ }).click();
 
   await expect(page.getByRole("heading", { name: "Food" })).toBeVisible();
   await page.getByRole("button", { name: "Tasks", exact: true }).click();
@@ -61,7 +66,7 @@ test("the default reaches every screen, and the Us row turns it over", async ({ 
 
 test("English counts agree with their nouns", async ({ page }) => {
   await fresh(page);
-  await page.getByRole("button", { name: /I'm 大宝/ }).click();
+  await page.getByRole("button", { name: /I'm Sweetie/ }).click();
   await page.getByRole("button", { name: "Memories", exact: true }).click();
 
   // One wish away from the first milestone: "1 wishes to go" is the whole

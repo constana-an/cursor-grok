@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArchiveIcon, CameraIcon, CheckCircledIcon, CheckIcon, ClockIcon, Cross1Icon, HeartFilledIcon, ResetIcon } from "@radix-ui/react-icons";
 import { STATUS_TEXT, localizeDesiredTime, localizedItemName } from "../lib/catalog";
 import { relativeTime } from "../lib/date";
+import { localizedPersonName } from "../lib/storage";
 import { KeyboardInput, useKeyboard } from "../shell";
 import { useI18n } from "../i18n";
 import type { TKey } from "../lib/i18n";
@@ -96,7 +97,11 @@ export function OrdersScreen({
             <button className="empty-action" onClick={onBrowseShop}>{t("orders.browse")}</button>
           </div>
         ) : visible.map((order) => {
+          // `currentName` is the stored name, because that is what the row
+          // recorded; the two names below are only what the reader sees.
           const mine = order.to === currentName;
+          const sender = localizedPersonName(order.from, lang);
+          const recipient = localizedPersonName(order.to, lang);
           const focused = order.id === focusOrderId;
           return (
             <article
@@ -106,7 +111,7 @@ export function OrdersScreen({
             >
               <div className="order-card-top">
                 <div className="order-art"><MenuArt item={order} /></div>
-                <div className="order-main"><span>{order.from} → {order.to}</span><h3>{localizedItemName(order, lang)}</h3><p>{relativeTime(order.createdAt, lang)} · {localizeDesiredTime(order.desiredTime, lang)}</p></div>
+                <div className="order-main"><span>{sender} → {recipient}</span><h3>{localizedItemName(order, lang)}</h3><p>{relativeTime(order.createdAt, lang)} · {localizeDesiredTime(order.desiredTime, lang)}</p></div>
                 <span className={`status-badge status-${order.status}`}>{STATUS_TEXT[lang][order.status]}</span>
               </div>
               {order.note && <div className="order-note">“{order.note}”</div>}
@@ -128,16 +133,16 @@ export function OrdersScreen({
                 )
               ) : (
                 <>
-                  <div className="order-waiting"><ClockIcon /> {t("orders.waiting", { name: order.to })}</div>
+                  <div className="order-waiting"><ClockIcon /> {t("orders.waiting", { name: recipient })}</div>
                   <button className="wide-action ghost" onClick={() => onCancel(order.id)}><ResetIcon /> {t("orders.cancel")}</button>
                 </>
               ))}
               {order.status === "accepted" && (mine
                 ? <button className="wide-action" onClick={() => onStatus(order.id, "doing")}><ClockIcon /> {t("orders.start")}</button>
-                : <div className="order-waiting"><CheckIcon /> {t("orders.accepted", { name: order.to })}</div>)}
+                : <div className="order-waiting"><CheckIcon /> {t("orders.accepted", { name: recipient })}</div>)}
               {order.status === "doing" && (mine
                 ? <button className="wide-action complete" onClick={() => onStatus(order.id, "done")}><HeartFilledIcon /> {t("orders.finish")}</button>
-                : <div className="order-waiting"><HeartFilledIcon /> {t("orders.preparing", { name: order.to })}</div>)}
+                : <div className="order-waiting"><HeartFilledIcon /> {t("orders.preparing", { name: recipient })}</div>)}
               {order.status === "done" && (
                 <>
                   <div className="order-waiting"><CheckCircledIcon /> {order.completedAt ? t("orders.completedAt", { time: relativeTime(order.completedAt, lang) }) : t("orders.completed")}</div>
@@ -147,12 +152,12 @@ export function OrdersScreen({
               )}
               {order.status === "rejected" && (
                 <>
-                  <div className="order-waiting"><Cross1Icon /> {t("orders.rejectedNote", { price: order.price, name: order.from })}</div>
+                  <div className="order-waiting"><Cross1Icon /> {t("orders.rejectedNote", { price: order.price, name: sender })}</div>
                   {order.declineNote && <div className="order-note">“{order.declineNote}”</div>}
                 </>
               )}
               {order.status === "cancelled" && (
-                <div className="order-waiting"><ResetIcon /> {t("orders.cancelledNote", { name: order.from, price: order.price })}</div>
+                <div className="order-waiting"><ResetIcon /> {t("orders.cancelledNote", { name: sender, price: order.price })}</div>
               )}
             </article>
           );
